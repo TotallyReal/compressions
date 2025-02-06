@@ -6,7 +6,7 @@ from line_profiler import LineProfiler
 pr = profile.Profile()
 pr.disable()
 
-from encoding_functions import Encoder, Source, Target
+from codecs_funcs.encoding_functions import BitStreamListEncoder, Encoder, ImageFileHeaderEncoder, HeaderInfo, BitStreamEncoder
 import numpy as np
 from typing import List, Tuple
 from enum import Enum
@@ -22,25 +22,30 @@ class ChunkOP(str, Enum):
     diff = '01'
     luma = '10'
 
-class QOIEncoder(Encoder[np.array, List[Chunk]]):
+    def __repr__(self):
+         return str(self)
 
-    def encode(self, rgb_seq: np.ndarray) -> List[Chunk]:
+class QOIChunkifier(Encoder[np.ndarray, List[Chunk]]):
+    """
+    input should be a sequence of r,g,b,a
+    """
+    def encode(self, rgba_seq: np.ndarray) -> List[Chunk]:
         previous = (0,0,0,255)
-        a = 255
 
         previous_pixels = [0] * 64
         chunks = []
 
-        bin_lookup_2 = [bin(i)[2:].zfill(6) for i in range(2**2)]
-        bin_lookup_4 = [bin(i)[2:].zfill(6) for i in range(2**4)]
+        bin_lookup_2 = [bin(i)[2:].zfill(2) for i in range(2**2)]
+        bin_lookup_4 = [bin(i)[2:].zfill(4) for i in range(2**4)]
         bin_lookup_6 = [bin(i)[2:].zfill(6) for i in range(2**6)]
-        bin_lookup_8 = [bin(i)[2:].zfill(6) for i in range(2**8)]
+        bin_lookup_8 = [bin(i)[2:].zfill(8) for i in range(2**8)]
 
         run_length = 0
-        for r,g,b in rgb_seq:
+        for r,g,b,a in rgba_seq:
             r = int(r)
             g = int(g)
             b = int(b)
+            a = int(a)
             # Check if this is part of a run of the same color
             if (r,g,b) == previous[:3]:
                 run_length += 1
@@ -110,7 +115,7 @@ class QOIEncoder(Encoder[np.array, List[Chunk]]):
 
         return chunks
 
-    def decode(self, chunks: List[Chunk]) -> np.array:
+    def decode(self, chunks: List[Chunk]) -> np.ndarray:
         previous = (0,0,0,255)
         r = 0
         g = 0
@@ -121,11 +126,6 @@ class QOIEncoder(Encoder[np.array, List[Chunk]]):
         sequence = []
 
         for chunk in chunks:
-
-            # validation = [image_arr[0][i] == tuple(sequence[i][:3]) for i in range(len(sequence))]
-            # if len(validation)==15:
-            #     temp = 5
-
             chunk_type = chunk[0]
 
             if chunk_type == ChunkOP.run:
@@ -167,70 +167,101 @@ class QOIEncoder(Encoder[np.array, List[Chunk]]):
             previous_pixels[index_position] = previous
             sequence.append(previous)
 
-        return sequence
-
-from PIL import Image
-import os
-import matplotlib.pyplot as plt
+        return np.array(sequence)
 
 
-url = '../alice with cards.jpg'
-img = Image.open(url)
+class ChunkToBitstream(BitStreamEncoder[Chunk]):
 
-image_arr = np.array(img)
-# for each pixel we have the 3 RGB values. Taking their averages, gives us a
-# gray scale version
-image_grayscale = np.round(np.mean(img, -1))
+    def encode(self, chunk: Chunk) -> str:
+        return ''.join(chunk)
 
-# ------------------------ Image size ------------------------
+    def decode_bits(self, bit_stream: str, index: int) -> Tuple[Chunk, int]:
 
-print('Image size data:')
-size_kb = int(os.path.getsize(url))//1024
-print(f'File size is {size_kb} kb')
+        def chunk_it(chunk_op: ChunkOP, index: int, *index_sep) -> Tuple[Chunk, int]:
+            data: List[str] = [bit_stream[index + i : index + j] for i,j in zip(index_sep, index_sep[1:])]
+            return (chunk_op, *data), index + index_sep[-1]
 
-# The image is a 3D array of size width x height x 3, and each entry
-# is an uint8, namely 1 byte.
-print(f'Image array dimension : {image_arr.shape}')
-print(f'Image array type : {image_arr.dtype}')
-rgb_img = np.array(img) #[0:2,:,:]
-h, w, _ = rgb_img.shape
-print(f'Total size should be: {(h*w*3)//1024} kb')
+        if bit_stream[index] == '0':
+            if bit_stream[index+1] == '0':
+                return chunk_it(ChunkOP.index, index, 2, 8)
+            else:
+                return chunk_it(ChunkOP.diff, index, 2, 4, 6, 8)
 
-# ------------------------ compression ------------------------
+        # First bit of chunk op is 1
+        if bit_stream[index+1] == '0':
+            return chunk_it(ChunkOP.luma, index, 2, 8, 12, 16)
 
+        if bit_stream[index+1:index+7]=='111111':
+            if bit_stream[index+7] == '0':
+                return chunk_it(ChunkOP.rgb, index, 8, 16, 24, 32)
+            else:
+                return chunk_it(ChunkOP.rgba, index, 8, 16, 24, 32, 40)
 
-encoder = QOIEncoder()
-image_seq = image_arr.reshape(-1,3).astype(int)
-lp = LineProfiler()
-# lp.add_function(encoder.encode)
-# lp.enable()
-pr.enable()
-coded = encoder.encode(image_seq)
-decompressed_image = encoder.decode(coded)
-pr.disable()
-# lp.disable()
-decompressed_image = np.array(decompressed_image)
-decompressed_image = decompressed_image.reshape(h, w, 4)
+        return chunk_it(ChunkOP.run, index, 2, 8)
 
-print_restriction=[]
-pstats.Stats(pr).strip_dirs().sort_stats("cumtime").print_stats(*print_restriction)
-# lp.print_stats()
+class ChunksToBitstream(BitStreamEncoder[List[Chunk]]):
 
-bit_str = ''.join([''.join([part for part in elem]) for elem in coded])
-print(f'Total bits = {len(bit_str)}')
-print(f'in kb = {len(bit_str)//(8*1024)}')
+    def encode(self, chunks: List[Chunk]) -> str:
+        return ''.join([ ''.join(chunk) for chunk in chunks])
+
+    def decode_bits(self, bit_stream: str, index: int) -> Tuple[List[Chunk], int]:
+        n = len(bit_stream)
+        chunks = []
+
+        def chunk_it(chunk_op: ChunkOP, index: int, *index_sep):
+            data: List[str] = [bit_stream[index + i : index + j] for i,j in zip(index_sep, index_sep[1:])]
+            chunks.append((chunk_op, *data))
+            return index + index_sep[-1]
 
 
-plt.figure(figsize=(8, 6))
+        while index < n:
+            if bit_stream[index] == '0':
+                if bit_stream[index+1] == '0':
+                    index = chunk_it(ChunkOP.index, index, 2, 8)
+                else:
+                    index = chunk_it(ChunkOP.diff, index, 2, 4, 6, 8)
+                continue
 
-plt.subplot(1, 2, 1)
-# plt.imshow(rgb_img[230:300, 830:900, :])
-plt.imshow(rgb_img)
-plt.axis('off')
+            # First bit of chunk op is 1
+            if bit_stream[index+1] == '0':
+                index = chunk_it(ChunkOP.luma, index, 2, 8, 12, 16)
+                continue
 
-plt.subplot(1, 2, 2)
-plt.imshow(decompressed_image)
-plt.axis('off')
+            if bit_stream[index+1:index+7]=='111111':
+                if bit_stream[index+7] == '0':
+                    index = chunk_it(ChunkOP.rgb, index, 8, 16, 24, 32)
+                else:
+                    index = chunk_it(ChunkOP.rgba, index, 8, 16, 24, 32, 40)
+                continue
 
-plt.show()
+            index = chunk_it(ChunkOP.run, index, 2, 8)
+
+        return chunks, index
+
+class QOIEncoder(BitStreamEncoder[np.array]):
+
+    def __init__(self):
+        self.header = ImageFileHeaderEncoder()
+        self.chunkifier = QOIChunkifier()
+        self.to_bitstream = BitStreamListEncoder(ChunkToBitstream())
+
+    def encode(self, image_arr: np.array) -> str:
+        h, w, _ = image_arr.shape
+        header_bit = self.header.encode(HeaderInfo(name='qoif', width=w, height=h))
+        # ignore channel and color space
+
+        chunks = self.chunkifier.encode(image_arr.reshape(-1,4))
+        bit_stream = self.to_bitstream.encode(chunks)
+
+        return f'{header_bit}{bit_stream}'
+
+
+    def decode_bits(self, bit_stream: str, index: int) -> Tuple[np.array, int]:
+        header_info, index = self.header.decode_bits(bit_stream, index)
+        assert header_info.name == 'qoif'
+
+        chunks, index = self.to_bitstream.decode_bits(bit_stream=bit_stream, index=index)
+        sequence = self.chunkifier.decode(chunks)
+
+        return sequence.reshape(header_info.height, header_info.width, 4), index
 
