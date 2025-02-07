@@ -17,6 +17,9 @@ let me know!
 I do intend in the future to create some notebooks explaining these compressions, so let me know
 if you are interested in any of them.
 
+<p align="center">
+  <img src="/images/alice6.png" />
+</p>
 
 ---
 
