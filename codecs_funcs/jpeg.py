@@ -4,10 +4,10 @@ from typing import List
 import numpy as np
 
 from codecs_funcs.encoding_functions import (
-    Blocker, List2DEncoder, DCTEncoder, ScaleEncoder, ZigZagEncoder, InitialCoefEncoder, RunLengthEncoder,
-    RL_ToBinaryEncoder, Encoder, DivisibleSizeEncoder, YCbCrEncoder, ImageFileHeaderEncoder,
-    HeaderInfo, Flatten, RL_ToBitStream, ListCombiner, BitStreamListEncoder, AverageEncoder, ListEncoder,
-    Bin_ZeroLen_NumBits_Num)
+    Blocker, List2DEncoder, DCTEncoder, ScaleEncoder, ZigZagEncoder, InitialCoefEncoder,
+    Encoder, DivisibleSizeEncoder, YCbCrEncoder, ImageFileHeaderEncoder,
+    HeaderInfo, Flatten, ListCombiner, BitStreamListEncoder, AverageEncoder, ListEncoder )
+from codecs_funcs.run_length import RunLengthEncoder, Bin_ZeroLen_NumBits_Num, RL_ToBinaryEncoder, RL_ToBitStream
 
 
 class JPEGEncoder(Encoder[np.ndarray, str]):

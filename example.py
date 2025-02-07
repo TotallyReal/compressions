@@ -51,6 +51,6 @@ def example_image_compression(
     plt.show()
 
 
-# example_image_compression(QOIEncoder(), 'images/alice with cards.jpg', 'RGBA')
-example_image_compression(JPEGEncoder(), 'images/alice with cards.jpg', 'RGB')
+example_image_compression(QOIEncoder(), 'images/alice with cards.jpg', 'RGBA')
+# example_image_compression(JPEGEncoder(), 'images/alice with cards.jpg', 'RGB')
 
