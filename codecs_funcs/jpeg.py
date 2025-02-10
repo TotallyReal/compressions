@@ -123,10 +123,3 @@ class JPEGEncoder(Encoder[np.ndarray, str]):
         return decoded
 
 
-def compute_frequencies(rl_chunks: List[Bin_ZeroLen_NumBits_Num]):
-    counters = defaultdict(lambda: 0)
-    total = len(rl_chunks)
-    for bin_zero_length, bin_number_bits, bin_number in rl_chunks:
-        counters[f'{bin_zero_length}{bin_number_bits}'] += 1
-    freq = {symbol: value/total for symbol, value in counters.items()}
-    return freq

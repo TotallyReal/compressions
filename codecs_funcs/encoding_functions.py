@@ -157,6 +157,14 @@ class List2DEncoder(Encoder[List[List[Source]], List[List[Target]]]):
             [self.encoder.decode(block) for block in row] for row in blocks
         ]
 
+class CharToByteEncoder(Encoder[str, str]):
+
+    def encode(self, char: str) -> str:
+        return format(ord(char), '08b')
+
+    def decode(self, binary_string: str) -> str:
+        return chr(int(binary_string, 2))
+
 # </editor-fold>
 
 # <editor-fold desc=" ------------------------ BitStream ------------------------">
@@ -194,6 +202,9 @@ class BitStreamListEncoder(BitStreamEncoder[List[Source]]):
     def __init__(self, encoder: BitStreamEncoder[Source]):
         self.encoder = encoder
         self.count = -1
+
+    def __str__(self):
+        return f'BitStreamList({self.encoder})'
 
     def encode(self, elements: List[Source]) -> str:
         return ''.join([self.encoder.encode(elem) for elem in elements])
