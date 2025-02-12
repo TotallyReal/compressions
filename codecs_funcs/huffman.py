@@ -1,14 +1,27 @@
-from collections import defaultdict, namedtuple
-from typing import List, Tuple, NamedTuple, Iterator, TypeVar, Generic, Callable
+from collections import defaultdict
+from typing import List, Tuple, TypeVar, Generic, Dict
 import heapq
 from dataclasses import dataclass
 
-from codecs_funcs.encoding_functions import BitStreamEncoder, Source
+from codecs_funcs.encoding_functions import BitStreamEncoder
 
 Elem = TypeVar('Elem')
 
+# <editor-fold desc=" ------------------------ Nodes for the binary trees ------------------------">
 class Node(Generic[Elem]):
-    pass
+
+    def as_dict(self) -> Tuple[Dict[str, str], str]:
+        nodes = dict()
+
+        def dfs(root: Node, index: int) -> Tuple[str, int]:
+            if isinstance(root, Leaf):
+                return str(root.data), index
+            left_node, index = dfs(root.left, index)
+            right_node, index = dfs(root.right, index)
+            nodes[f'_{index}'] = (left_node, right_node)
+            return f'_{index}', index+1
+        root, _ = dfs(self, 0)
+        return nodes, root
 
 @dataclass(frozen=True)
 class Branch(Node[Elem]):
@@ -18,6 +31,8 @@ class Branch(Node[Elem]):
 @dataclass(frozen=True)
 class Leaf(Node[Elem]):
     data: Elem
+
+# </editor-fold>
 
 class HuffmanFactory:
 
@@ -30,13 +45,8 @@ class HuffmanFactory:
             counters[elem] += 1
         frequency = {symbol: value/total for symbol, value in counters.items()}
 
-        # freq_list = sorted([(freq, symbol) for symbol, freq in frequency.items()])
-        # for freq, symbol in freq_list:
-        #     print(f'{chr(int(symbol, 2))} : {freq}   -   {counters[symbol]}')
-        # print(total)
-
         # Generate the Huffman tree. The middle index is just so that the heap will not try to
-        # sort the node objects (in case two of them have the same weight).
+        # sort the node objects (in case two of them having the same weight).
         nodes: List[Tuple[float, int, Node[Elem]]] = [
             (weight, -i, Leaf(data=elem)) for i, (elem, weight) in enumerate(frequency.items())]
         heapq.heapify(nodes)  # min heap
@@ -53,6 +63,22 @@ class HuffmanFactory:
         return nodes[0][2]
 
 class BinaryTreeRepEncoder(BitStreamEncoder[Node[str]]):
+    """
+    Encoding the structure of a full binary tree via a DFS.
+    1. Each time seeing an internal node for the first time, encode as '0', then encode left, then right
+    2. When seeing a leaf, encode as '1' and then the data on the leaf.
+    3. The data is encoded with constant length of bits, given in the initialization of this object.
+
+    For example: The tree below is encoded as
+        001A1B1C
+    since we go down twice on internal node, then see the leaf for A, leaf for B and leaf for C
+
+            root
+         0/     \1
+         *       C
+      0/  \1
+      A    B
+    """
 
     def __init__(self, token_len: int):
         self.token_length = token_len
@@ -86,6 +112,20 @@ class BinaryTreeRepEncoder(BitStreamEncoder[Node[str]]):
         return dfs(bit_stream, index)
 
 class BinaryTreeEncoder(BitStreamEncoder[Elem]):
+    """
+    Use a binary (prefix free) tree of elements fo encode them.
+    The encoding of an element, is the labels appearing in the tree from the root to that
+    element.
+
+    For example: The tree below encodes: A->00, B->01, C->1.
+
+                root
+             0/     \1
+             *       C
+          0/  \1
+          A    B
+    """
+
     def __init__(self, root: Node[Elem]):
 
         self.encoding = dict()
