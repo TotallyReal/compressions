@@ -3,12 +3,19 @@
 Trying to refresh my memory and learn more about compression techniques, I decided to write them 
 down and see how it works.
 
-So far I implemented the JPEG image compression (though didn't add the Huffman coding yet), and 
-an interesting new lossless compression called [The Quite OK](https://qoiformat.org/) image compression.
+My first goal was image and video compression, though text compression and general algorithms will arise naturally. In particular I got a little 
+bit side tracked with Huffman codes, and ended up with a [full google colab notebook](https://colab.research.google.com/drive/14iJaLgw66eKPS27O2w4_szyeTwQTGn7U) to explain how it works. 
+I didn't add the full mathematics behind it, and the interesting story of entropy, but I did partially wrote about it a long time ago, which you can [find in my homepage](https://prove-me-wrong.com/2018/04/01/how-to-measure-information-using-entropy/).
+
+<p align="center">
+  <img src="/images/english_huffman.png" width="1000"/>
+</p>
+
+Other than the general Huffman code, I already implemented the JPEG image compression, and an interesting 
+new lossless compression called [The Quite OK](https://qoiformat.org/) image compression.
 The next are PNG and H264, and then some more basic text compressions.
 
-The idea right now is just to get the compressions to work, so I can understand and play around
-with them. 
+The idea right now is just to get the compressions to work, so I can understand their structure and play around with them. 
 
 They are not implemented here to be fast (and using python certainly doesn't help). However,
 if you read this and have suggestions how to make them faster, while keeping it readable, please
