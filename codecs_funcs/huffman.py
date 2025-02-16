@@ -36,20 +36,17 @@ class Leaf(Node[Elem]):
 
 class HuffmanFactory:
 
+
     @staticmethod
-    def tree_from_list(elements: List[Elem]):
-        # compute frequencies
+    def frequencies(elements: List[Elem])-> Dict[Elem, float]:
         counters = defaultdict(lambda: 0)
         total = len(elements)
         for elem in elements:
             counters[elem] += 1
-        frequency = {symbol: value/total for symbol, value in counters.items()}
+        return {symbol: value/total for symbol, value in counters.items()}
 
-        # freq_list = sorted([(freq, symbol) for symbol, freq in frequency.items()])
-        # for freq, symbol in freq_list:
-        #     print(f'{chr(int(symbol, 2))} : {freq}   -   {counters[symbol]}')
-        # print(total)
-
+    @staticmethod
+    def tree_from_frequencies(frequency: Dict[Elem, float]):
         # Generate the Huffman tree. The middle index is just so that the heap will not try to
         # sort the node objects (in case two of them have the same weight).
         nodes: List[Tuple[float, int, Node[Elem]]] = [
@@ -66,6 +63,13 @@ class HuffmanFactory:
             index += 1
 
         return nodes[0][2]
+
+    @staticmethod
+    def tree_from_list(elements: List[Elem]):
+        frequencies = HuffmanFactory.frequencies(elements)
+        return HuffmanFactory.tree_from_frequencies(frequencies)
+
+
 
 class BinaryTreeRepEncoder(BitStreamEncoder[Node[str]]):
 
